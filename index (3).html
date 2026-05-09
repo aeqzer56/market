@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KiberMarket — доска объявлений класса</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+<style>
+:root {
+  --bg:        #faf9f7;
+  --surface:   #ffffff;
+  --surface2:  #f4f2ef;
+  --border:    #e8e4de;
+  --border2:   #d4cfc7;
+  --text:      #1a1814;
+  --text2:     #6b6560;
+  --text3:     #a09890;
+  --accent:    #c8853a;
+  --accent-lt: #f5ebe0;
+  --accent-dk: #9c631f;
+  --green:     #3a7d5c;
+  --blue:      #3a6b9c;
+  --radius:    16px;
+  --radius-sm: 10px;
+  --shadow:    0 4px 20px rgba(0,0,0,.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* HEADER */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,249,247,.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px;
+}
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.01em;
+}
+.logo span { color: var(--accent); }
+.header-badge {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-size: 12px; color: var(--text2); font-weight: 500;
+}
+#listingCount { color: var(--accent); font-weight: 700; }
+
+/* HERO */
+.hero {
+  padding: 72px 32px 56px;
+  max-width: 700px; margin: 0 auto; text-align: center;
+}
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent-lt); color: var(--accent-dk);
+  border-radius: 100px; padding: 5px 14px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(36px, 5vw, 58px); font-weight: 900; line-height: 1.1;
+  margin-bottom: 16px;
+}
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero p {
+  color: var(--text2); font-size: 15px; max-width: 440px;
+  margin: 0 auto 36px; line-height: 1.75;
+}
+.btn-post {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--text); color: var(--bg);
+  font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 14px 28px; border-radius: 100px; border: none; cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.btn-post:hover { background: var(--accent); transform: translateY(-2px); }
+
+/* FILTERS */
+.filters-wrap { padding: 0 32px 32px; max-width: 1120px; margin: 0 auto; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2); border-radius: 100px; padding: 8px 18px;
+  font-size: 13px; font-family: 'Sora', sans-serif; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.filter-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+.filter-btn.active { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 600; }
+
+/* GRID */
+.grid-wrap { padding: 0 32px 80px; max-width: 1120px; margin: 0 auto; }
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* CARD */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; cursor: pointer;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+  animation: fadeUp .4s ease both;
+}
+.card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border2); }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-image {
+  width: 100%; height: 200px; overflow: hidden;
+  background: var(--surface2); position: relative;
+}
+.card-image img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.card:hover .card-image img { transform: scale(1.04); }
+.card-image-placeholder {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; color: var(--text3); font-size: 11px; font-weight: 500;
+}
+.card-image-placeholder svg { opacity: .35; }
+.card-body { padding: 18px 20px 16px; }
+.card-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.card-title { font-weight: 600; font-size: 15px; line-height: 1.35; }
+.card-price { font-weight: 700; font-size: 15px; color: var(--accent); white-space: nowrap; }
+.card-desc {
+  font-size: 13px; color: var(--text2); margin-bottom: 14px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  line-height: 1.55;
+}
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 12px; border-top: 1px solid var(--border);
+}
+.card-author { display: flex; align-items: center; gap: 8px; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.author-name { font-size: 12px; font-weight: 600; }
+.card-meta { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text3); }
+.comment-count { display: flex; align-items: center; gap: 3px; }
+
+/* CATEGORY TAGS */
+.cat-tag {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 100px; margin-bottom: 10px; letter-spacing: .02em;
+}
+
+/* EMPTY & LOADING */
+.empty-state {
+  text-align: center; padding: 80px 20px; color: var(--text2); grid-column: 1 / -1;
+}
+.empty-state .emoji { font-size: 48px; margin-bottom: 16px; }
+.empty-state h3 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
+.loading-dots {
+  display: flex; gap: 6px; justify-content: center; padding: 80px; grid-column: 1 / -1;
+}
+.loading-dots span {
+  width: 7px; height: 7px; background: var(--accent); border-radius: 50%;
+  animation: bounce 1.2s infinite; opacity: .6;
+}
+.loading-dots span:nth-child(2) { animation-delay: .2s; }
+.loading-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(.7); }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+/* OVERLAY */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(20,18,15,.5);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  z-index: 200; align-items: center; justify-content: center; padding: 20px;
+}
+.overlay.open { display: flex; }
+
+/* MODAL */
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 24px; width: 100%; max-width: 520px; max-height: 92vh;
+  overflow-y: auto; box-shadow: var(--shadow-lg);
+  animation: popIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+.modal::-webkit-scrollbar { width: 4px; }
+.modal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.94) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 28px 0;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.modal-header h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; }
+.close-btn {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text2);
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s; flex-shrink: 0;
+}
+.close-btn:hover { background: var(--border2); color: var(--text); }
+.modal-body { padding: 20px 28px 28px; }
+
+/* FORM */
+.form-group { margin-bottom: 16px; }
+label {
+  display: block; font-size: 11px; font-weight: 600; color: var(--text3);
+  letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px;
+}
+input, textarea, select {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-family: 'Sora', sans-serif; font-size: 14px; padding: 11px 14px;
+  transition: border-color .15s, box-shadow .15s; outline: none; resize: vertical;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(200,133,58,.1);
+}
+input::placeholder, textarea::placeholder { color: var(--text3); }
+select option { background: var(--surface); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* IMAGE UPLOAD */
+.image-upload-area {
+  border: 2px dashed var(--border2); border-radius: var(--radius-sm);
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s; background: var(--surface2);
+  position: relative;
+}
+.image-upload-area:hover, .image-upload-area.drag-over {
+  border-color: var(--accent); background: var(--accent-lt);
+}
+.image-upload-area input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  width: 100%; height: 100%; padding: 0; border: none; background: transparent; box-shadow: none;
+}
+.upload-icon { margin-bottom: 8px; color: var(--text3); }
+.upload-text { font-size: 13px; color: var(--text2); font-weight: 500; }
+.upload-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+.image-preview-wrap {
+  display: none; position: relative; border-radius: var(--radius-sm);
+  overflow: hidden; height: 180px; background: var(--surface2);
+}
+.image-preview-wrap.has-image { display: block; }
+.image-preview-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.image-remove-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 50%;
+  width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  transition: background .15s;
+}
+.image-remove-btn:hover { background: rgba(0,0,0,.85); }
+
+.upload-progress {
+  display: none; height: 3px; background: var(--border);
+  border-radius: 100px; margin-top: 8px; overflow: hidden;
+}
+.upload-progress.show { display: block; }
+.upload-progress-bar {
+  height: 100%; background: var(--accent); border-radius: 100px; transition: width .2s ease; width: 0%;
+}
+
+.btn-submit {
+  width: 100%; background: var(--text); color: var(--bg); border: none;
+  border-radius: var(--radius-sm); font-family: 'Sora', sans-serif;
+  font-size: 14px; font-weight: 600; padding: 14px; cursor: pointer;
+  margin-top: 8px; transition: background .2s, transform .15s;
+}
+.btn-submit:hover { background: var(--accent); transform: translateY(-1px); }
+.btn-submit:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* DETAIL MODAL */
+.detail-modal { max-width: 600px; }
+.detail-image {
+  width: 100%; height: 280px; overflow: hidden;
+  background: var(--surface2); border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+}
+.detail-image img { width: 100%; height: 100%; object-fit: cover; }
+.detail-image-placeholder {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center; color: var(--text3);
+}
+.detail-price-big {
+  font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 900;
+  color: var(--accent); margin: 12px 0 10px; line-height: 1;
+}
+.detail-desc { color: var(--text2); font-size: 14px; line-height: 1.75; margin-bottom: 20px; white-space: pre-wrap; }
+.detail-seller {
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  margin-bottom: 24px; border: 1px solid var(--border);
+}
+.detail-seller .avatar { width: 42px; height: 42px; font-size: 15px; }
+.seller-info small { display: block; font-size: 11px; color: var(--text3); font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
+.seller-info strong { font-size: 14px; font-weight: 600; display: block; margin: 2px 0; }
+.seller-contact { font-size: 13px; color: var(--blue); }
+.modal-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+.comments-section h3 { font-weight: 600; font-size: 14px; margin-bottom: 16px; }
+.comment-list { margin-bottom: 16px; max-height: 260px; overflow-y: auto; }
+.comment-list::-webkit-scrollbar { width: 4px; }
+.comment-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.comment-item { display: flex; gap: 10px; margin-bottom: 12px; animation: fadeUp .25s ease both; }
+.comment-bubble {
+  background: var(--surface2); border-radius: 4px 12px 12px 12px;
+  padding: 10px 14px; flex: 1; border: 1px solid var(--border);
+}
+.comment-bubble .c-name { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+.comment-bubble .c-text { font-size: 13px; color: var(--text2); }
+.comment-bubble .c-time { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.no-comments { text-align: center; color: var(--text3); font-size: 13px; padding: 20px; }
+.comment-form { display: flex; gap: 8px; align-items: flex-end; }
+.comment-inputs { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.comment-form input { border-radius: 8px; padding: 9px 12px; font-size: 13px; }
+.send-btn {
+  background: var(--text); color: var(--bg); border: none; border-radius: 8px;
+  padding: 0 16px; font-weight: 600; font-size: 13px; font-family: 'Sora', sans-serif;
+  cursor: pointer; white-space: nowrap; transition: background .15s;
+  height: 38px; display: flex; align-items: center;
+}
+.send-btn:hover { background: var(--accent); }
+.send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* CONFIG BANNER */
+.config-banner {
+  background: #fef3e8; border: 1px solid #f0c88a; border-radius: var(--radius-sm);
+  padding: 16px 20px; margin: 0 32px 24px; font-size: 13px; display: none; color: var(--text2);
+}
+.config-banner.show { display: block; }
+.config-banner h4 { font-weight: 700; font-size: 13px; color: var(--accent-dk); margin-bottom: 6px; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  font-weight: 600; font-size: 13px; padding: 12px 24px;
+  border-radius: 100px; z-index: 999;
+  transition: transform .35s cubic-bezier(.34,1.4,.64,1);
+  pointer-events: none; white-space: nowrap; box-shadow: var(--shadow);
+  background: var(--text); color: var(--bg);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: #c0392b; color: #fff; }
+.toast.ok  { background: var(--green); color: #fff; }
+
+@media (max-width: 600px) {
+  header { padding: 0 20px; }
+  .hero { padding: 48px 20px 40px; }
+  .filters-wrap, .grid-wrap { padding-left: 20px; padding-right: 20px; }
+  .form-row { grid-template-columns: 1fr; }
+  .modal-header { padding: 20px 20px 0; }
+  .modal-body { padding: 16px 20px 24px; }
+  .config-banner { margin: 0 20px 20px; }
+  .detail-image { height: 200px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Kiber<span>Market</span></div>
+  <div class="header-badge">Объявлений: <span id="listingCount">0</span></div>
+</header>
+
+<div class="hero">
+  <div class="hero-eyebrow">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    Доска объявлений класса
+  </div>
+  <h1>Продавай, покупай,<br><em>договаривайся</em></h1>
+  <p>Вещи, услуги, хобби — разместить объявление можно за минуту. Найди покупателя среди своих.</p>
+  <button class="btn-post" onclick="openPostModal()">
+    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Разместить объявление
+  </button>
+</div>
+
+<div class="config-banner" id="configBanner">
+  <h4>⚙️ Firebase не настроен</h4>
+  <p>Замени значения в firebaseConfig на данные из своего проекта. Включи Firestore и Storage в Firebase Console.</p>
+</div>
+
+<div class="filters-wrap">
+  <div class="filters" id="filterBar">
+    <button class="filter-btn active" data-cat="all">Все</button>
+    <button class="filter-btn" data-cat="вещи">🏷️ Вещи</button>
+    <button class="filter-btn" data-cat="услуги">🎨 Услуги</button>
+    <button class="filter-btn" data-cat="хобби">✨ Хобби</button>
+    <button class="filter-btn" data-cat="другое">📦 Другое</button>
+  </div>
+</div>
+
+<div class="grid-wrap">
+  <div class="listings-grid" id="listingsGrid">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<!-- MODAL: POST -->
+<div class="overlay" id="postOverlay" onclick="closeOnBg(event,'postOverlay')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Новое объявление</h2>
+      <button class="close-btn" onclick="closeModal('postOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Фото товара</label>
+        <div class="image-preview-wrap" id="previewWrap">
+          <img id="previewImg" src="" alt="preview">
+          <button class="image-remove-btn" onclick="removeImage(event)">×</button>
+        </div>
+        <div class="image-upload-area" id="uploadArea">
+          <input type="file" id="imageFile" accept="image/*" onchange="handleImageSelect(event)">
+          <div class="upload-icon">
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.3">
+              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div class="upload-text">Нажми или перетащи фото</div>
+          <div class="upload-hint">JPG, PNG, WEBP · до 5 МБ</div>
+        </div>
+        <div class="upload-progress" id="uploadProgress">
+          <div class="upload-progress-bar" id="uploadProgressBar"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Твоё имя</label>
+        <input type="text" id="authorName" placeholder="Например: Алия" maxlength="40">
+      </div>
+      <div class="form-group">
+        <label>Заголовок объявления</label>
+        <input type="text" id="listingTitle" placeholder="Что продаёшь или предлагаешь?" maxlength="80">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Категория</label>
+          <select id="listingCat">
+            <option value="вещи">🏷️ Вещи</option>
+            <option value="услуги">🎨 Услуги</option>
+            <option value="хобби">✨ Хобби</option>
+            <option value="другое">📦 Другое</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Цена (тенге)</label>
+          <input type="number" id="listingPrice" placeholder="500" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Описание</label>
+        <textarea id="listingDesc" rows="3" placeholder="Расскажи подробнее: состояние, почему продаёшь..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Контакт (необязательно)</label>
+        <input type="text" id="listingContact" placeholder="WhatsApp, Telegram, номер..." maxlength="80">
+      </div>
+      <button class="btn-submit" id="submitBtn" onclick="submitListing()">Опубликовать →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL -->
+<div class="overlay" id="detailOverlay" onclick="closeOnBg(event,'detailOverlay')">
+  <div class="modal detail-modal">
+    <div class="modal-header">
+      <div id="detailCatTag"></div>
+      <button class="close-btn" onclick="closeModal('detailOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-image" id="detailImage">
+        <div class="detail-image-placeholder">
+          <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>
+      </div>
+      <h2 id="detailTitle" style="font-family:'Playfair Display',serif;font-size:24px;line-height:1.2;font-weight:700;"></h2>
+      <div class="detail-price-big" id="detailPrice"></div>
+      <p class="detail-desc" id="detailDesc"></p>
+      <div class="detail-seller">
+        <div class="avatar" id="detailAvatar"></div>
+        <div class="seller-info">
+          <small>Продавец</small>
+          <strong id="detailAuthor"></strong>
+          <span class="seller-contact" id="detailContact"></span>
+        </div>
+      </div>
+      <hr class="modal-divider">
+      <div class="comments-section">
+        <h3>💬 Комментарии (<span id="commentCountLabel">0</span>)</h3>
+        <div class="comment-list" id="commentList">
+          <div class="no-comments">Пока нет комментариев. Будь первым!</div>
+        </div>
+        <div class="comment-form">
+          <div class="comment-inputs">
+            <input type="text" id="commentName" placeholder="Твоё имя" maxlength="40">
+            <input type="text" id="commentText" placeholder="Напиши вопрос или предложение..." onkeydown="if(event.key==='Enter')sendComment()">
+          </div>
+          <button class="send-btn" id="sendCommentBtn" onclick="sendComment()">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyBZR2uZfopaEXgFxgQswAzCYT03ZG84kH0",
+  authDomain:        "wish-board-69411.firebaseapp.com",
+  projectId:         "wish-board-69411",
+  storageBucket:     "wish-board-69411.firebasestorage.app",
+  messagingSenderId: "327737368284",
+  appId:             "1:327737368284:web:7d239ef2b40aa48f27de19"
+};
+
+let db, storage, configured = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  if (firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('ВСТАВЬ')) {
+    db = firebase.firestore();
+    storage = firebase.storage();
+    configured = true;
+  }
+} catch(e) { console.warn('Firebase init error:', e); }
+
+if (!configured) {
+  document.getElementById('configBanner').classList.add('show');
+  loadDemoData();
+}
+
+const catColors = {
+  'вещи':   { bg:'#fef3e8', text:'#c8853a' },
+  'услуги': { bg:'#e8f0fb', text:'#3a6b9c' },
+  'хобби':  { bg:'#e8f6ef', text:'#3a7d5c' },
+  'другое': { bg:'#f3e8fb', text:'#7c3aad' },
+};
+const avatarColors = ['#c8853a','#3a6b9c','#3a7d5c','#7c3aad','#c03a6b','#3a7c9c','#9c6b3a','#3a9c7c'];
+
+function getAvatarColor(name) {
+  let h = 0;
+  for(let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) & 0xffff;
+  return avatarColors[h % avatarColors.length];
+}
+function initials(name) { return name.trim().slice(0,2).toUpperCase(); }
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = (Date.now() - (ts.toMillis ? ts.toMillis() : ts)) / 1000;
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return Math.floor(diff/60) + ' мин назад';
+  if (diff < 86400) return Math.floor(diff/3600) + ' ч назад';
+  return Math.floor(diff/86400) + ' дн назад';
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatPrice(p) {
+  if (!p && p !== 0) return '—';
+  return Number(p).toLocaleString('ru-RU') + ' ₸';
+}
+
+let allListings = [], currentFilter = 'all', currentListingId = null;
+let unsubComments = null, selectedImageFile = null;
+
+function loadListings() {
+  if (!configured) return;
+  db.collection('listings').orderBy('createdAt','desc').limit(100)
+    .onSnapshot(snap => {
+      allListings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      document.getElementById('listingCount').textContent = allListings.length;
+      renderListings();
+    }, err => {
+      console.error(err);
+      showToast('Ошибка загрузки. Проверь Firebase.', 'err');
+    });
+}
+
+function renderListings() {
+  const grid = document.getElementById('listingsGrid');
+  const filtered = currentFilter === 'all' ? allListings : allListings.filter(l => l.category === currentFilter);
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div class="emoji">🛒</div><h3>Объявлений пока нет</h3><p>Будь первым — разместить объявление легко!</p></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map((l, i) => {
+    const c = catColors[l.category] || catColors['другое'];
+    const color = getAvatarColor(l.author || 'А');
+    const imageHtml = l.imageUrl
+      ? `<div class="card-image"><img src="${escHtml(l.imageUrl)}" alt="${escHtml(l.title)}" loading="lazy"></div>`
+      : `<div class="card-image"><div class="card-image-placeholder"><svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>Нет фото</span></div></div>`;
+    return `<div class="card" onclick="openDetail('${l.id}')" style="animation-delay:${i*0.04}s">
+      ${imageHtml}
+      <div class="card-body">
+        <span class="cat-tag" style="background:${c.bg};color:${c.text};">${l.category}</span>
+        <div class="card-top">
+          <div class="card-title">${escHtml(l.title)}</div>
+          <div class="card-price">${formatPrice(l.price)}</div>
+        </div>
+        <div class="card-desc">${escHtml(l.description || '')}</div>
+        <div class="card-footer">
+          <div class="card-author">
+            <div class="avatar" style="background:${color}">${initials(l.author||'?')}</div>
+            <div class="author-name">${escHtml(l.author||'Аноним')}</div>
+          </div>
+          <div class="card-meta">
+            <div class="comment-count">
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              ${l.commentCount || 0}
+            </div>
+            <span>${timeAgo(l.createdAt)}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('filterBar').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.cat;
+  renderListings();
+});
+
+/* IMAGE UPLOAD */
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('Файл слишком большой (макс. 5 МБ)', 'err'); return; }
+  selectedImageFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('previewImg').src = ev.target.result;
+    document.getElementById('previewWrap').classList.add('has-image');
+    document.getElementById('uploadArea').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage(e) {
+  e.stopPropagation();
+  selectedImageFile = null;
+  document.getElementById('previewImg').src = '';
+  document.getElementById('previewWrap').classList.remove('has-image');
+  document.getElementById('uploadArea').style.display = '';
+  document.getElementById('imageFile').value = '';
+}
+
+const uploadArea = document.getElementById('uploadArea');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleImageSelect({ target: { files: [file] } });
+});
+
+async function uploadImage(file) {
+  if (!storage) return null;
+  const ext = file.name.split('.').pop();
+  const path = `listings/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const progressBar = document.getElementById('uploadProgressBar');
+  const progressWrap = document.getElementById('uploadProgress');
+  progressWrap.classList.add('show');
+  return new Promise((resolve, reject) => {
+    const task = storage.ref(path).put(file);
+    task.on('state_changed',
+      snap => { progressBar.style.width = (snap.bytesTransferred / snap.totalBytes * 100) + '%'; },
+      err => { progressWrap.classList.remove('show'); reject(err); },
+      async () => { progressWrap.classList.remove('show'); resolve(await task.snapshot.ref.getDownloadURL()); }
+    );
+  });
+}
+
+/* POST */
+function openPostModal() { document.getElementById('postOverlay').classList.add('open'); }
+
+async function submitListing() {
+  const name  = document.getElementById('authorName').value.trim();
+  const title = document.getElementById('listingTitle').value.trim();
+  const cat   = document.getElementById('listingCat').value;
+  const price = document.getElementById('listingPrice').value;
+  const desc  = document.getElementById('listingDesc').value.trim();
+  const cont  = document.getElementById('listingContact').value.trim();
+
+  if (!name || !title || !price) { showToast('Заполни имя, заголовок и цену!', 'err'); return; }
+  if (isNaN(price) || Number(price) < 0) { showToast('Введи корректную цену', 'err'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Публикую...';
+
+  try {
+    let imageUrl = null;
+    if (selectedImageFile) { btn.textContent = 'Загружаю фото...'; imageUrl = await uploadImage(selectedImageFile); }
+    await db.collection('listings').add({
+      author: name, title, category: cat, price: Number(price),
+      description: desc, contact: cont, imageUrl: imageUrl || null,
+      commentCount: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal('postOverlay'); clearPostForm();
+    showToast('✅ Объявление опубликовано!', 'ok');
+  } catch(e) { console.error(e); showToast('Ошибка. Попробуй ещё раз.', 'err'); }
+  btn.disabled = false; btn.textContent = 'Опубликовать →';
+}
+
+function clearPostForm() {
+  ['authorName','listingTitle','listingPrice','listingDesc','listingContact'].forEach(id => document.getElementById(id).value = '');
+  removeImage({ stopPropagation: () => {} }); selectedImageFile = null;
+}
+
+/* DETAIL */
+function openDetail(id) {
+  const l = allListings.find(x => x.id === id);
+  if (!l) return;
+  currentListingId = id;
+  const c = catColors[l.category] || catColors['другое'];
+  const color = getAvatarColor(l.author || 'А');
+  const detailImage = document.getElementById('detailImage');
+  if (l.imageUrl) {
+    detailImage.innerHTML = `<img src="${escHtml(l.imageUrl)}" alt="${escHtml(l.title)}">`;
+  } else {
+    detailImage.innerHTML = `<div class="detail-image-placeholder"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
+  }
+  document.getElementById('detailCatTag').innerHTML = `<span class="cat-tag" style="background:${c.bg};color:${c.text};">${l.category}</span>`;
+  document.getElementById('detailTitle').textContent = l.title;
+  document.getElementById('detailPrice').textContent = formatPrice(l.price);
+  document.getElementById('detailDesc').textContent = l.description || '(описание не указано)';
+  document.getElementById('detailAuthor').textContent = l.author || 'Аноним';
+  const av = document.getElementById('detailAvatar');
+  av.textContent = initials(l.author||'?'); av.style.background = color;
+  document.getElementById('detailContact').textContent = l.contact ? '📞 ' + l.contact : '';
+  document.getElementById('detailOverlay').classList.add('open');
+  loadComments(id);
+}
+
+/* COMMENTS */
+function loadComments(listingId) {
+  if (unsubComments) unsubComments();
+  const list = document.getElementById('commentList');
+  list.innerHTML = '<div style="display:flex;gap:6px;justify-content:center;padding:20px;"><span style="width:6px;height:6px;background:var(--accent);border-radius:50%;animation:bounce 1.2s infinite"></span><span style="width:6px;height:6px;background:var(--accent);border-radius:50%;animation:bounce 1.2s .2s infinite"></span><span style="width:6px;height:6px;background:var(--accent);border-radius:50%;animation:bounce 1.2s .4s infinite"></span></div>';
+  unsubComments = db.collection('listings').doc(listingId).collection('comments')
+    .orderBy('createdAt','asc').limit(50)
+    .onSnapshot(snap => {
+      const comments = snap.docs.map(d => d.data());
+      document.getElementById('commentCountLabel').textContent = comments.length;
+      if (comments.length === 0) { list.innerHTML = '<div class="no-comments">Пока нет комментариев. Будь первым!</div>'; return; }
+      list.innerHTML = comments.map(c => {
+        const color = getAvatarColor(c.author || 'А');
+        return `<div class="comment-item">
+          <div class="avatar" style="background:${color};width:30px;height:30px;font-size:11px;">${initials(c.author||'?')}</div>
+          <div class="comment-bubble">
+            <div class="c-name">${escHtml(c.author||'Аноним')}</div>
+            <div class="c-text">${escHtml(c.text)}</div>
+            <div class="c-time">${timeAgo(c.createdAt)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      list.scrollTop = list.scrollHeight;
+    });
+}
+
+async function sendComment() {
+  const name = document.getElementById('commentName').value.trim();
+  const text = document.getElementById('commentText').value.trim();
+  if (!name || !text) { showToast('Введи имя и комментарий', 'err'); return; }
+  if (!currentListingId) return;
+  const btn = document.getElementById('sendCommentBtn'); btn.disabled = true;
+  try {
+    const batch = db.batch();
+    const commentRef = db.collection('listings').doc(currentListingId).collection('comments').doc();
+    batch.set(commentRef, { author: name, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    batch.update(db.collection('listings').doc(currentListingId), { commentCount: firebase.firestore.FieldValue.increment(1) });
+    await batch.commit();
+    document.getElementById('commentText').value = '';
+  } catch(e) { console.error(e); showToast('Не удалось отправить', 'err'); }
+  btn.disabled = false;
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'detailOverlay' && unsubComments) { unsubComments(); unsubComments = null; }
+}
+function closeOnBg(e, id) { if (e.target.id === id) closeModal(id); }
+
+function showToast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.className = 'toast', 3000);
+}
+
+function loadDemoData() {
+  allListings = [
+    { id:'d1', author:'Алия', title:'Велосипед горный', category:'вещи', price:25000, description:'Продаю горный велосипед, куплен 2 года назад. Состояние хорошее. Все 21 скорость работают.', contact:'WhatsApp: +7 701 XXX XX XX', commentCount:2, imageUrl:null, createdAt:null },
+    { id:'d2', author:'Данияр', title:'Рисую портреты на заказ', category:'услуги', price:2000, description:'Рисую цифровые портреты в стиле аниме или реализм. Срок — 2-3 дня.', contact:'', commentCount:5, imageUrl:null, createdAt:null },
+    { id:'d3', author:'Карина', title:'Вязаные браслеты', category:'хобби', price:500, description:'Делаю красивые плетёные браслеты на заказ. Любые цвета и надписи!', contact:'', commentCount:3, imageUrl:null, createdAt:null },
+    { id:'d4', author:'Санжар', title:'Помогаю с ChatGPT', category:'услуги', price:1000, description:'Обучу пользоваться нейросетями: ChatGPT, Midjourney, Gemini. 1 час урока.', contact:'Telegram: @sanzhar', commentCount:1, imageUrl:null, createdAt:null },
+    { id:'d5', author:'Дина', title:'Наушники TWS', category:'вещи', price:5000, description:'Продаю TWS наушники. Работают отлично. Зарядный кейс в комплекте.', contact:'', commentCount:0, imageUrl:null, createdAt:null },
+    { id:'d6', author:'Арман', title:'Уроки Python', category:'услуги', price:1500, description:'Занимаюсь программированием 3 года. Обучу основам Python. Онлайн или после занятий.', contact:'', commentCount:4, imageUrl:null, createdAt:null },
+  ];
+  document.getElementById('listingCount').textContent = allListings.length;
+  renderListings();
+}
+
+if (configured) loadListings();
+</script>
+</body>
+</html>
